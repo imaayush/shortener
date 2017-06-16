@@ -1,11 +1,12 @@
 
-package main
+package short
 
 import (
 	"net/http"
-	"github.com/gorilla/mux"
+	//"github.com/gorilla/mux"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"log"
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -13,12 +14,13 @@ func main() {
 	//Migrate the schema
 	db := Database(DevDb)
 	db.AutoMigrate(&Short{})
-
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/short", ShortUrl )
-	router.HandleFunc("/{uuid}", ExpandUrl)
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+
+	router.Handle("/short", ShortUrl(DevDb) )
+	router.Handle("/{uuid}", ExpandUrl(DevDb))
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 
 }
 
