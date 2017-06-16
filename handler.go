@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"fmt"
+	"net/url"
+	"strings"
 )
 
 func ShortUrl(w http.ResponseWriter, r *http.Request) {
@@ -18,13 +20,35 @@ func ShortUrl(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &ShortInput); err != nil {
 		panic(err)
 	}
-	url := ShortInput.Url
-	ShortUrl := GenerateShortUrl()
-	short := Short{Url: url, ShortUrl:ShortUrl}
-	db := Database()
-	db.Save(&short)
-	if err := json.NewEncoder(w).Encode(short); err != nil {
-		panic(err)
+	UrlStr := ShortInput.Url
+	if u, err := url.Parse(UrlStr); err == nil {
+		if u.Host == "" {
+			HostName := strings.Split(u.Path, ".")
+			if len(HostName) <= 1{
+				panic("please enter correct url")
+			}else if u.Scheme == ""{
+				u.Scheme = "https"
+				fmt.Println("set https scheme ")
+			}
+		}
+
+		LongUrl := u.String()
+		ShortUrl := GenerateShortUrl()
+		fmt.Println(LongUrl)
+		var short Short
+
+		db := Database(DevDb)
+		if err := db.Where("url = ?", LongUrl).Find(&short).Error; err != nil {
+			short = Short{Url: LongUrl, ShortUrl:ShortUrl}
+			db.Save(&short)
+		} else {
+			short = Short{Url:short.Url, ShortUrl: short.ShortUrl}
+		}
+
+		var data = ShortOut{Url:short.Url, ShortUrl: short.ShortUrl}
+		if err := json.NewEncoder(w).Encode(data); err != nil {
+			panic(err)
+		}
 	}
 
 }
@@ -33,8 +57,7 @@ func ExpandUrl(w http.ResponseWriter, r *http.Request) {
 	var short Short
 	vars := mux.Vars(r)
 	ShortUrl := vars["uuid"]
-	db := Database()
+	db := Database(DevDb)
 	db.Where("short_url = ?", ShortUrl).Find(&short)
-	fmt.Println(short.Url)
 	http.Redirect(w, r, short.Url, 301)
 }

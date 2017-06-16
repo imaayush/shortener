@@ -11,7 +11,7 @@ import (
 func main() {
 
 	//Migrate the schema
-	db := Database()
+	db := Database(DevDb)
 	db.AutoMigrate(&Short{})
 
 	router := mux.NewRouter().StrictSlash(true)
