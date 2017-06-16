@@ -1,4 +1,4 @@
-package main
+package short
 
 import (
 	"net/http"
@@ -7,43 +7,53 @@ import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"fmt"
+	"net/http/httptest"
 )
 
 func TestShort(t *testing.T){
-
-	u := ShortInput{"gmail.com"}
+	db := Database(TestDb)
+	db.AutoMigrate(&Short{})
+	u := ShortInput{"https://goolge.com"}
 	b := new(bytes.Buffer)
 	json.NewEncoder(b).Encode(u)
 	var data ShortOut
+	res, _ := http.NewRequest("POST", "/short", b)
+	w := httptest.NewRecorder()
+	ShortUrl := ShortUrl(TestDb)
+	ShortUrl.ServeHTTP(w, res)
 
-	res, _ := http.Post("http://localhost:8080/short", "application/json; charset=utf-8", b)
-	defer res.Body.Close()
+	json.NewDecoder(w.Body).Decode(&data)
+	assert.Equal(t, u.Url, data.Url)
 
-	assert.Equal(t, 200, res.StatusCode)
-
-	json.NewDecoder(res.Body).Decode(&data)
-	//assert.Equal(t, u.Url, data.Url)
-	db := Database(DevDb)
 	var short Short
 	db.Where("url = ?", data.Url).Find(&short)
+	fmt.Println(data)
 	assert.Equal(t, short.ShortUrl, data.ShortUrl)
 }
 
 func TestExpand( t *testing.T){
-	u := ShortInput{"fb.com"}
+	u := ShortInput{"https://www.goolge.com"}
 	b := new(bytes.Buffer)
 	json.NewEncoder(b).Encode(u)
 	var response ShortOut
 
-	res, _ := http.Post("http://localhost:8080/short", "application/json; charset=utf-8", b)
+	res, _ := http.NewRequest("POST", "/short", b)
+	w := httptest.NewRecorder()
+	ShortUrl := ShortUrl(TestDb)
+	ShortUrl.ServeHTTP(w, res)
 
-	assert.Equal(t, 200, res.StatusCode)
+	assert.Equal(t, 200, w.Code)
 
-	json.NewDecoder(res.Body).Decode(&response)
+	json.NewDecoder(w.Body).Decode(&response)
 	fmt.Println(response.Url)
-	url := "http://localhost:8080/" + string(response.ShortUrl)
+	url := "/" + string(response.ShortUrl)
 	fmt.Println(url)
-	resp, _ := http.Get(url)
-	assert.Equal(t, 200, resp.StatusCode)
-	
+	res, _ = http.NewRequest("POST", "/short", b)
+	w = httptest.NewRecorder()
+	ExpandUrl := ExpandUrl(TestDb)
+	ExpandUrl.ServeHTTP(w, res)
+	fmt.Println(w)
+	fmt.Println(res)
+	assert.Equal(t, 301, w.Code)
+
 }
