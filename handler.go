@@ -1,4 +1,4 @@
-package main
+package short
 
 import (
 	"net/http"
@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
 )
 
-func ShortUrl(w http.ResponseWriter, r *http.Request) {
+func ShortUrl(db string) http.Handler{
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		panic(err)
@@ -37,7 +39,7 @@ func ShortUrl(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(LongUrl)
 		var short Short
 
-		db := Database(DevDb)
+		db := Database(db)
 		if err := db.Where("url = ?", LongUrl).Find(&short).Error; err != nil {
 			short = Short{Url: LongUrl, ShortUrl:ShortUrl}
 			db.Save(&short)
@@ -50,14 +52,16 @@ func ShortUrl(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 	}
-
+	})
 }
 
-func ExpandUrl(w http.ResponseWriter, r *http.Request) {
-	var short Short
-	vars := mux.Vars(r)
-	ShortUrl := vars["uuid"]
-	db := Database(DevDb)
-	db.Where("short_url = ?", ShortUrl).Find(&short)
-	http.Redirect(w, r, short.Url, 301)
+func ExpandUrl(db string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var short Short
+		vars := mux.Vars(r)
+		ShortUrl := vars["uuid"]
+		db := Database(db)
+		db.Where("short_url = ?", ShortUrl).Find(&short)
+		http.Redirect(w, r, short.Url, 301)
+	})
 }
