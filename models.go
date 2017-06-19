@@ -1,4 +1,5 @@
-package short
+package main
+
 
 import "github.com/jinzhu/gorm"
 
