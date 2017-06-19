@@ -5,55 +5,81 @@ import (
 	"testing"
 	"bytes"
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
-	"fmt"
 	"net/http/httptest"
+	"github.com/stretchr/testify/assert"
+	"os"
 )
 
-func TestShort(t *testing.T){
-	db := Database(TestDb)
-	db.AutoMigrate(&Short{})
-	u := ShortInput{"https://goolge.com"}
-	b := new(bytes.Buffer)
-	json.NewEncoder(b).Encode(u)
-	var data ShortOut
-	res, _ := http.NewRequest("POST", "/short", b)
-	w := httptest.NewRecorder()
-	ShortUrl := ShortUrl(TestDb)
-	ShortUrl.ServeHTTP(w, res)
+var ts *httptest.Server
 
-	json.NewDecoder(w.Body).Decode(&data)
-	assert.Equal(t, u.Url, data.Url)
+func TestMain(m *testing.M){
 
-	var short Short
-	db.Where("url = ?", data.Url).Find(&short)
-	fmt.Println(data)
-	assert.Equal(t, short.ShortUrl, data.ShortUrl)
+	routes := NewRouter()
+	ts = httptest.NewServer(routes)
+
+	ret := m.Run()
+	os.Exit(ret)
 }
 
-func TestExpand( t *testing.T){
-	u := ShortInput{"https://www.goolge.com"}
+func TestShortPass(t *testing.T){
+	TestCase := "https://goolge.com/home/param=11"
+	db := Database()
+	var data ShortOut
+	var short Short
+
+	u := ShortInput{TestCase}
 	b := new(bytes.Buffer)
 	json.NewEncoder(b).Encode(u)
-	var response ShortOut
+	req, _ := http.NewRequest("POST", ts.URL + "/short", b)
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	json.NewDecoder(resp.Body).Decode(&data)
+	assert.Equal(t, u.Url, data.Url)
+	assert.Equal(t, resp.StatusCode, 200)
+	db.Where("short_url = ?", data.ShortUrl).Find(&short)
 
-	res, _ := http.NewRequest("POST", "/short", b)
-	w := httptest.NewRecorder()
-	ShortUrl := ShortUrl(TestDb)
-	ShortUrl.ServeHTTP(w, res)
+	assert.Equal(t, short.ShortUrl, data.ShortUrl)
 
-	assert.Equal(t, 200, w.Code)
+}
 
-	json.NewDecoder(w.Body).Decode(&response)
-	fmt.Println(response.Url)
-	url := "/" + string(response.ShortUrl)
-	fmt.Println(url)
-	res, _ = http.NewRequest("POST", "/short", b)
-	w = httptest.NewRecorder()
-	ExpandUrl := ExpandUrl(TestDb)
-	ExpandUrl.ServeHTTP(w, res)
-	fmt.Println(w)
-	fmt.Println(res)
-	assert.Equal(t, 301, w.Code)
 
+func TestExpandPass( t *testing.T){
+
+	TestCase := "https://goolge.com/"
+	var data ShortOut
+
+	u := ShortInput{TestCase}
+	b := new(bytes.Buffer)
+	json.NewEncoder(b).Encode(u)
+	req, _ := http.NewRequest("POST", ts.URL + "/short", b)
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+
+	json.NewDecoder(resp.Body).Decode(&data)
+
+	assert.Equal(t, u.Url, data.Url)
+	url := ts.URL + "/" + data.ShortUrl
+
+	req, _ = http.NewRequest("GET", url, nil)
+	client = &http.Client{}
+	resp, _ = client.Do(req)
+
+	json.NewDecoder(resp.Body).Decode(&data)
+	assert.Equal(t, resp.StatusCode, 200)
+
+}
+
+
+func TestShortFail(t *testing.T) {
+	TestCase := "google"
+
+	var data ShortOut
+	u := ShortInput{TestCase}
+	b := new(bytes.Buffer)
+	json.NewEncoder(b).Encode(u)
+	req, _ := http.NewRequest("POST", ts.URL + "/short", b)
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	json.NewDecoder(resp.Body).Decode(&data)
+	assert.Equal(t, resp.StatusCode, 402)
 }
