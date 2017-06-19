@@ -1,21 +1,20 @@
 package main
 
 import (
-	"net/http"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"log"
-
+	"net/http"
 )
 
 func main() {
 	app := App{}
-	app.Initialize("", "" , DbName)
+	app.Initialize("", "", DbName)
 
 	app.Run()
 
 }
 
-func (app *App)Initialize(user, password, DbName string){
+func (app *App) Initialize(user, password, DbName string) {
 
 	app.DB = Database(DbName)
 
@@ -25,5 +24,3 @@ func (app *App)Initialize(user, password, DbName string){
 func (a *App) Run() {
 	log.Fatal(http.ListenAndServe(":8080", a.Router))
 }
-
-

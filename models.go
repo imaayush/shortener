@@ -1,20 +1,18 @@
 package main
 
-
 import "github.com/jinzhu/gorm"
 
 type Short struct {
-gorm.Model
-	Url       string   `sql:"not null`
-	ShortUrl  string   `sql:"not null;unique"`
+	gorm.Model
+	Url      string `sql:"not null`
+	ShortUrl string `sql:"not null;unique"`
 }
 
 type ShortInput struct {
-	Url       string   `sql:"not null`
+	Url string `sql:"not null`
 }
 
-type ShortOut struct{
-	Url       string   `sql:"not null`
-	ShortUrl  string   `sql:"not null;unique"`
+type ShortOut struct {
+	Url      string `sql:"not null`
+	ShortUrl string `sql:"not null;unique"`
 }
-
