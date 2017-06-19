@@ -11,8 +11,7 @@ import (
 
 )
 
-func ShortUrl(db string) http.Handler{
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func ShortUrl(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		panic(err)
@@ -27,7 +26,9 @@ func ShortUrl(db string) http.Handler{
 		if u.Host == "" {
 			HostName := strings.Split(u.Path, ".")
 			if len(HostName) <= 1{
-				panic("please enter correct url")
+				http.Error(w,"please enter correct url", 402)
+				return
+
 			}else if u.Scheme == ""{
 				u.Scheme = "https"
 				fmt.Println("set https scheme ")
@@ -36,10 +37,9 @@ func ShortUrl(db string) http.Handler{
 
 		LongUrl := u.String()
 		ShortUrl := GenerateShortUrl()
-		fmt.Println(LongUrl)
 		var short Short
 
-		db := Database(db)
+		db := Database()
 		if err := db.Where("url = ?", LongUrl).Find(&short).Error; err != nil {
 			short = Short{Url: LongUrl, ShortUrl:ShortUrl}
 			db.Save(&short)
@@ -52,16 +52,17 @@ func ShortUrl(db string) http.Handler{
 			panic(err)
 		}
 	}
-	})
+
 }
 
-func ExpandUrl(db string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var short Short
-		vars := mux.Vars(r)
-		ShortUrl := vars["uuid"]
-		db := Database(db)
-		db.Where("short_url = ?", ShortUrl).Find(&short)
-		http.Redirect(w, r, short.Url, 301)
-	})
+func ExpandUrl(w http.ResponseWriter, r *http.Request) {
+	var short Short
+	vars := mux.Vars(r)
+	ShortUrl := vars["uuid"]
+	fmt.Println(ShortUrl)
+	db := Database()
+	db.Where("short_url = ?", ShortUrl).Find(&short)
+	fmt.Println(short.Url)
+	http.Redirect(w, r, short.Url, 200)
+
 }
