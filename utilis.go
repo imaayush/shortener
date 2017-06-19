@@ -1,13 +1,22 @@
-package short
+package main
+
 
 import (
 	"github.com/jinzhu/gorm"
 	"math/rand"
+	"github.com/gorilla/mux"
+	"sync"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+type App struct{
+	Router *mux.Router
+	DB     *gorm.DB
+	sync.Mutex
+}
+
 var DbName = "/tmp/dev.db"
-//var DbName = "/tmp/testdb.db"
+var TestDb = "/tmp/dev.db"
 
 
 func GenerateShortUrl()string{
@@ -17,17 +26,25 @@ func GenerateShortUrl()string{
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
-	db := Database()
-	var short Short
-	if err := db.Where("short_url = ?", string(b)).Find(&short).Error; err != nil {
-		return string(b)
-	}else{
-		return GenerateShortUrl()
-	}
+
+	return string(b)
+
 
 }
 
-func Database() *gorm.DB {
+func (app *App)CheckIsUnqiue(url string)bool{
+	db := app.DB
+	var short Short
+	if err := db.Where("short_url = ?", string(url)).Find(&short).Error; err != nil {
+		return true
+	}else{
+		return false
+	}
+}
+
+
+
+func Database(DbName string) *gorm.DB {
 	//open a db connection
 	db, err := gorm.Open("sqlite3", DbName )
 	if err != nil {
