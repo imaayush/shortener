@@ -37,23 +37,26 @@ func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Println(u.Host)
 		LongUrl := u.String()
-		UnquieUrl := false
+
 		var ShortUrl string
-		for UnquieUrl != true {
-			ShortUrl = GenerateShortUrl()
-			app.Lock()
-			UnquieUrl = app.CheckIsUnqiue(ShortUrl)
-			app.Unlock()
-		}
 
 		var short Short
 		fmt.Println(ShortUrl)
 		db := app.DB
 		if err := db.Where("url = ?", LongUrl).Find(&short).Error; err != nil {
+			UnquieUrl := false
+			app.Lock()
+			for UnquieUrl != true {
+				ShortUrl = GenerateShortUrl()
+
+				UnquieUrl = app.CheckIsUnqiue(ShortUrl)
+
+			}
 			short = Short{Url: LongUrl, ShortUrl: ShortUrl}
 			if err := db.Save(&short).Error; err != nil {
 				http.Error(w, "UNIQUE constraint failed", 400)
 			}
+			app.Unlock()
 		} else {
 			short = Short{Url: short.Url, ShortUrl: short.ShortUrl}
 		}

@@ -15,8 +15,8 @@ type App struct {
 	sync.Mutex
 }
 
-var DbName = "/tmp/dev.db"
-var TestDb = "/tmp/dev.db"
+var DbName = "/tmp/short.db"
+var TestDb = "/tmp/short.db"
 
 func GenerateShortUrl() string {
 	n := 4
@@ -43,8 +43,10 @@ func (app *App) CheckIsUnqiue(url string) bool {
 func Database(DbName string) *gorm.DB {
 	//open a db connection
 	db, err := gorm.Open("sqlite3", DbName)
+
 	if err != nil {
 		panic("failed to connect database")
 	}
+	db.AutoMigrate(&Short{})
 	return db
 }
