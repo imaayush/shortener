@@ -23,25 +23,52 @@ func TestMain(m *testing.M) {
 	os.Exit(ret)
 }
 
-func MakeRequest(t *testing.T, Input ShortInput, data *ShortOut) *http.Response {
+func MakeRequest(t *testing.T, Input ShortInput, data *ShortOut, method string) *http.Response {
+	if method == "POST" {
+
+		b := new(bytes.Buffer)
+		json.NewEncoder(b).Encode(Input)
+		req, _ := http.NewRequest("POST", ts.URL+"/short", b)
+		client := &http.Client{}
+		resp, _ := client.Do(req)
+
+		json.NewDecoder(resp.Body).Decode(&data)
+		return resp
+	} else {
+		req, _ := http.NewRequest("GET", Input.Url, nil)
+
+		client := &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			}}
+		resp, _ := client.Do(req)
+		return resp
+	}
+}
+
+func MultMakeRequest(t *testing.T, Input ShortInput, c chan ShortOut) {
+	var data ShortOut
 	b := new(bytes.Buffer)
 	json.NewEncoder(b).Encode(Input)
 	req, _ := http.NewRequest("POST", ts.URL+"/short", b)
 	client := &http.Client{}
 	resp, _ := client.Do(req)
-
 	json.NewDecoder(resp.Body).Decode(&data)
-	return resp
+	c <- data
+
 }
-
+func cleanTable() {
+	app.DB.Delete(&Short{})
+	app.DB.AutoMigrate(&Short{})
+}
 func TestShortUrlEndPointPassCase(t *testing.T) {
-
+	cleanTable()
 	TestUrl := "https://goolge.com/home/param=11"
 	Input := ShortInput{TestUrl}
 	db := app.DB
 	var data ShortOut
 	var short Short
-	resp := MakeRequest(t, Input, &data)
+	resp := MakeRequest(t, Input, &data, "POST")
 	assert.Equal(t, resp.StatusCode, 200)
 	assert.Equal(t, Input.Url, data.Url)
 	db.Where("short_url = ?", data.ShortUrl).Find(&short)
@@ -50,21 +77,16 @@ func TestShortUrlEndPointPassCase(t *testing.T) {
 }
 
 func TestExpandUrlEndPointPassCase(t *testing.T) {
+	cleanTable()
 
 	TestUrl := "http://goolge.com/"
 	var data ShortOut
 	Input := ShortInput{TestUrl}
-	MakeRequest(t, Input, &data)
+	MakeRequest(t, Input, &data, "POST")
 	assert.Equal(t, Input.Url, data.Url)
 	url := ts.URL + "/" + data.ShortUrl
-
-	req, _ := http.NewRequest("GET", url, nil)
-
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		}}
-	resp, _ := client.Do(req)
+	Input = ShortInput{url}
+	resp := MakeRequest(t, Input, &data, "GET")
 	assert.Equal(t, resp.StatusCode, 301)
 
 }
@@ -74,18 +96,54 @@ func TestWrongInput(t *testing.T) {
 
 	var data ShortOut
 	Input := ShortInput{TestCase}
-	resp := MakeRequest(t, Input, &data)
+	resp := MakeRequest(t, Input, &data, "POST")
 	assert.Equal(t, resp.StatusCode, 400)
 }
 
 func TestShortUrlNotFound(t *testing.T) {
 	var data ShortOut
 	url := ts.URL + "/" + "ASDFW"
-
-	req, _ := http.NewRequest("GET", url, nil)
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-
-	json.NewDecoder(resp.Body).Decode(&data)
+	Input := ShortInput{url}
+	resp := MakeRequest(t, Input, &data, "GET")
 	assert.Equal(t, resp.StatusCode, 404)
+}
+
+func TestShortUrlUniqueness(t *testing.T) {
+	cleanTable()
+
+	TestUrl := "http://goolge.com/"
+	//var data ShortOut
+	c := make(chan ShortOut)
+	output := make([]ShortOut, 5)
+
+	Input := ShortInput{TestUrl}
+	for i, _ := range output {
+		go MultMakeRequest(t, Input, c)
+		output[i] = <-c
+
+	}
+	for i, _ := range output {
+		assert.Equal(t, output[1], output[i])
+	}
+
+}
+func TestCollisionPreveation(t *testing.T) {
+	cleanTable()
+	output := make([]ShortOut, 5)
+	c := make(chan ShortOut)
+	TestUrls := []string{"http://goolge.com/", "http://fb.com", "http://facebook.com", "http://oogway.in", "https://tour.golang.org/moretypes/6"}
+	for i, _ := range TestUrls {
+		Input := ShortInput{TestUrls[i]}
+		go MultMakeRequest(t, Input, c)
+		output[i] = <-c
+	}
+
+	for i, _ := range TestUrls {
+		for j, _ := range TestUrls {
+			if j != i {
+				assert.NotEqual(t, output[i], output[j])
+			}
+
+		}
+	}
 }
