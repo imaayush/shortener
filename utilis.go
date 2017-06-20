@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"math/rand"
 	"sync"
 )
@@ -42,7 +43,7 @@ func (app *App) CheckIsUnqiue(url string) bool {
 
 func Database(DbName string) *gorm.DB {
 	//open a db connection
-	db, err := gorm.Open("sqlite3", DbName)
+	db, err := gorm.Open("postgres", "host=127.0.0.1 user=short dbname=short sslmode=disable password=123456")
 
 	if err != nil {
 		panic("failed to connect database")
