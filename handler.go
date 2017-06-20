@@ -21,7 +21,6 @@ func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	UrlStr := ShortInput.Url
-	fmt.Println(UrlStr)
 
 	if u, err := url.Parse(UrlStr); err == nil {
 		if u.Host == "" {
@@ -35,13 +34,13 @@ func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 				fmt.Println("set https scheme ")
 			}
 		}
-		fmt.Println(u.Host)
+
 		LongUrl := u.String()
 
 		var ShortUrl string
 
 		var short Short
-		fmt.Println(ShortUrl)
+
 		db := app.DB
 		if err := db.Where("url = ?", LongUrl).Find(&short).Error; err != nil {
 			UnquieUrl := false
@@ -62,7 +61,6 @@ func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var data = ShortOut{Url: short.Url, ShortUrl: short.ShortUrl}
-		fmt.Println(data)
 		if err := json.NewEncoder(w).Encode(data); err != nil {
 			panic(err)
 		}
@@ -76,14 +74,11 @@ func (app *App) ExpandUrl(w http.ResponseWriter, r *http.Request) {
 	var short Short
 	vars := mux.Vars(r)
 	ShortUrl := vars["uuid"]
-	fmt.Println(ShortUrl)
 	db := app.DB
 	if err := db.Where("short_url = ?", ShortUrl).Find(&short).Error; err != nil {
 		http.Error(w, "Page not found", 404)
 		return
 	}
-	fmt.Println("hello")
-	fmt.Println(short.Url)
 
 	http.Redirect(w, r, short.Url, 301)
 	return
