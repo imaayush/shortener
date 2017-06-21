@@ -110,19 +110,17 @@ func TestShortUrlNotFound(t *testing.T) {
 
 func TestShortUrlUniqueness(t *testing.T) {
 	cleanTable()
-	letterRunes = rune("abcd")
+	N := 10
 	TestUrl := "http://goolge.com/"
-	//var data ShortOut
 	c := make(chan ShortOut)
-	output := make([]ShortOut, 5)
+	output := make([]ShortOut, 10)
 
 	Input := ShortInput{TestUrl}
-	for i, _ := range output {
+	for i := 0; i < N; i++ {
 		go MultMakeRequest(t, Input, c)
-		output[i] = <-c
 
 	}
-	for i, _ := range output {
+	for i := 0; i < N; i++ {
 		output[i] = <-c
 	}
 	for i, _ := range output {
@@ -132,7 +130,6 @@ func TestShortUrlUniqueness(t *testing.T) {
 }
 func TestCollisionPreveation(t *testing.T) {
 	cleanTable()
-	letterRunes = rune("abcd")
 	N := 10
 	output := make([]ShortOut, N)
 	c := make(chan ShortOut)
@@ -155,4 +152,22 @@ func TestCollisionPreveation(t *testing.T) {
 
 		}
 	}
+}
+
+func TestCollision(t *testing.T) {
+	//cleanTable()
+	TestUrl := "https://goolge.com/home/param=11"
+	Input := ShortInput{TestUrl}
+	db := app.DB
+	var data ShortOut
+	var short Short
+	resp := MakeRequest(t, Input, &data, "POST")
+	assert.Equal(t, resp.StatusCode, 200)
+	short = Short{Url: data.Url, ShortUrl: data.ShortUrl}
+	if err := db.Save(&short).Error; err != nil {
+
+		errStr := "pq: duplicate key value violates unique constraint \"shorts_short_url_key\""
+		assert.EqualError(t, err, errStr)
+	}
+
 }
