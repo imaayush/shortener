@@ -23,27 +23,28 @@ func TestMain(m *testing.M) {
 	os.Exit(ret)
 }
 
-func MakeRequest(t *testing.T, Input ShortInput, data *ShortOut, method string) *http.Response {
-	if method == "POST" {
+func MakePostRequest(t *testing.T, Input ShortInput, data *ShortOut) *http.Response {
 
-		b := new(bytes.Buffer)
-		json.NewEncoder(b).Encode(Input)
-		req, _ := http.NewRequest("POST", ts.URL+"/short", b)
-		client := &http.Client{}
-		resp, _ := client.Do(req)
+	b := new(bytes.Buffer)
+	json.NewEncoder(b).Encode(Input)
+	req, _ := http.NewRequest("POST", ts.URL+"/short", b)
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	json.NewDecoder(resp.Body).Decode(&data)
+	return resp
 
-		json.NewDecoder(resp.Body).Decode(&data)
-		return resp
-	} else {
-		req, _ := http.NewRequest("GET", Input.Url, nil)
+}
 
-		client := &http.Client{
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			}}
-		resp, _ := client.Do(req)
-		return resp
-	}
+func MakeGetRequest(t *testing.T, Input ShortInput) *http.Response {
+	req, _ := http.NewRequest("GET", Input.Url, nil)
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}}
+	resp, _ := client.Do(req)
+	return resp
+
 }
 
 func cleanTable() {
@@ -57,7 +58,7 @@ func TestShortUrlEndPointPassCase(t *testing.T) {
 	db := app.DB
 	var data ShortOut
 	var short Short
-	resp := MakeRequest(t, Input, &data, "POST")
+	resp := MakePostRequest(t, Input, &data)
 	assert.Equal(t, resp.StatusCode, 200)
 	assert.Equal(t, Input.Url, data.Url)
 	db.Where("short_url = ?", data.ShortUrl).Find(&short)
@@ -71,11 +72,11 @@ func TestExpandUrlEndPointPassCase(t *testing.T) {
 	TestUrl := "http://goolge.com/"
 	var data ShortOut
 	Input := ShortInput{TestUrl}
-	MakeRequest(t, Input, &data, "POST")
+	MakePostRequest(t, Input, &data)
 	assert.Equal(t, Input.Url, data.Url)
 	url := ts.URL + "/" + data.ShortUrl
 	Input = ShortInput{url}
-	resp := MakeRequest(t, Input, &data, "GET")
+	resp := MakeGetRequest(t, Input)
 	assert.Equal(t, resp.StatusCode, 301)
 
 }
@@ -85,15 +86,14 @@ func TestWrongInput(t *testing.T) {
 
 	var data ShortOut
 	Input := ShortInput{TestCase}
-	resp := MakeRequest(t, Input, &data, "POST")
+	resp := MakePostRequest(t, Input, &data)
 	assert.Equal(t, resp.StatusCode, 400)
 }
 
 func TestShortUrlNotFound(t *testing.T) {
-	var data ShortOut
 	url := ts.URL + "/" + "ASDFW"
 	Input := ShortInput{url}
-	resp := MakeRequest(t, Input, &data, "GET")
+	resp := MakeGetRequest(t, Input)
 	assert.Equal(t, resp.StatusCode, 404)
 }
 
@@ -104,11 +104,29 @@ func TestCollision(t *testing.T) {
 	db := app.DB
 	var data ShortOut
 	var short Short
-	resp := MakeRequest(t, Input, &data, "POST")
+	resp := MakePostRequest(t, Input, &data)
 	assert.Equal(t, resp.StatusCode, 200)
 	short = Short{Url: data.Url, ShortUrl: data.ShortUrl}
 	err := db.Save(&short).Error
 	errStr := "pq: duplicate key value violates unique constraint \"shorts_short_url_key\""
 	assert.EqualError(t, err, errStr)
 
+}
+func TestIsNotUnquie(t *testing.T) {
+	cleanTable()
+	TestUrl := "https://goolge.com/home/param=11"
+	Input := ShortInput{TestUrl}
+
+	var data ShortOut
+
+	resp := MakePostRequest(t, Input, &data)
+	assert.Equal(t, resp.StatusCode, 200)
+
+	assert.Equal(t, app.CheckIsUnqiue(data.ShortUrl), false)
+}
+
+func TestIsUnqiue(t *testing.T) {
+	cleanTable()
+	ShortUrl := GenerateShortUrl()
+	assert.Equal(t, app.CheckIsUnqiue(ShortUrl), true)
 }
