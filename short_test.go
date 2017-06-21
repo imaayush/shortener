@@ -110,7 +110,7 @@ func TestShortUrlNotFound(t *testing.T) {
 
 func TestShortUrlUniqueness(t *testing.T) {
 	cleanTable()
-
+	letterRunes = rune("abcd")
 	TestUrl := "http://goolge.com/"
 	//var data ShortOut
 	c := make(chan ShortOut)
@@ -123,25 +123,34 @@ func TestShortUrlUniqueness(t *testing.T) {
 
 	}
 	for i, _ := range output {
+		output[i] = <-c
+	}
+	for i, _ := range output {
 		assert.Equal(t, output[1], output[i])
 	}
 
 }
 func TestCollisionPreveation(t *testing.T) {
 	cleanTable()
-	output := make([]ShortOut, 5)
+	letterRunes = rune("abcd")
+	N := 10
+	output := make([]ShortOut, N)
 	c := make(chan ShortOut)
-	TestUrls := []string{"http://goolge.com/", "http://fb.com", "http://facebook.com", "http://oogway.in", "https://tour.golang.org/moretypes/6"}
+	TestUrls := []string{}
+	for i := 0; i < N; i++ {
+		TestUrls = append(TestUrls, ("http://goolge.com/" + string(i)))
+	}
 	for i, _ := range TestUrls {
 		Input := ShortInput{TestUrls[i]}
 		go MultMakeRequest(t, Input, c)
+	}
+	for i, _ := range TestUrls {
 		output[i] = <-c
 	}
-
 	for i, _ := range TestUrls {
 		for j, _ := range TestUrls {
 			if j != i {
-				assert.NotEqual(t, output[i], output[j])
+				assert.NotEqual(t, output[i].ShortUrl, output[j].ShortUrl)
 			}
 
 		}
