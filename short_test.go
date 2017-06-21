@@ -46,17 +46,6 @@ func MakeRequest(t *testing.T, Input ShortInput, data *ShortOut, method string) 
 	}
 }
 
-func MultMakeRequest(t *testing.T, Input ShortInput, c chan ShortOut) {
-	var data ShortOut
-	b := new(bytes.Buffer)
-	json.NewEncoder(b).Encode(Input)
-	req, _ := http.NewRequest("POST", ts.URL+"/short", b)
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-	json.NewDecoder(resp.Body).Decode(&data)
-	c <- data
-
-}
 func cleanTable() {
 	app.DB.Delete(&Short{})
 	app.DB.AutoMigrate(&Short{})
@@ -108,54 +97,8 @@ func TestShortUrlNotFound(t *testing.T) {
 	assert.Equal(t, resp.StatusCode, 404)
 }
 
-func TestShortUrlUniqueness(t *testing.T) {
-	cleanTable()
-	N := 10
-	TestUrl := "http://goolge.com/"
-	c := make(chan ShortOut)
-	output := make([]ShortOut, 10)
-
-	Input := ShortInput{TestUrl}
-	for i := 0; i < N; i++ {
-		go MultMakeRequest(t, Input, c)
-
-	}
-	for i := 0; i < N; i++ {
-		output[i] = <-c
-	}
-	for i, _ := range output {
-		assert.Equal(t, output[1], output[i])
-	}
-
-}
-func TestCollisionPreveation(t *testing.T) {
-	cleanTable()
-	N := 10
-	output := make([]ShortOut, N)
-	c := make(chan ShortOut)
-	TestUrls := []string{}
-	for i := 0; i < N; i++ {
-		TestUrls = append(TestUrls, ("http://goolge.com/" + string(i)))
-	}
-	for i, _ := range TestUrls {
-		Input := ShortInput{TestUrls[i]}
-		go MultMakeRequest(t, Input, c)
-	}
-	for i, _ := range TestUrls {
-		output[i] = <-c
-	}
-	for i, _ := range TestUrls {
-		for j, _ := range TestUrls {
-			if j != i {
-				assert.NotEqual(t, output[i].ShortUrl, output[j].ShortUrl)
-			}
-
-		}
-	}
-}
-
 func TestCollision(t *testing.T) {
-	//cleanTable()
+	cleanTable()
 	TestUrl := "https://goolge.com/home/param=11"
 	Input := ShortInput{TestUrl}
 	db := app.DB
@@ -164,10 +107,8 @@ func TestCollision(t *testing.T) {
 	resp := MakeRequest(t, Input, &data, "POST")
 	assert.Equal(t, resp.StatusCode, 200)
 	short = Short{Url: data.Url, ShortUrl: data.ShortUrl}
-	if err := db.Save(&short).Error; err != nil {
-
-		errStr := "pq: duplicate key value violates unique constraint \"shorts_short_url_key\""
-		assert.EqualError(t, err, errStr)
-	}
+	err := db.Save(&short).Error
+	errStr := "pq: duplicate key value violates unique constraint \"shorts_short_url_key\""
+	assert.EqualError(t, err, errStr)
 
 }
