@@ -20,53 +20,55 @@ func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &ShortInput); err != nil {
 		panic(err)
 	}
-	UrlStr := ShortInput.Url
 
-	if u, err := url.Parse(UrlStr); err == nil {
-		if u.Host == "" {
-			HostName := strings.Split(u.Path, ".")
-			if len(HostName) <= 1 {
-				http.Error(w, "please enter correct url", 400)
-				return
+	u, err := url.Parse(ShortInput.Url)
+	if err != nil {
+		http.Error(w, "please enter correct url", 400)
+		return
+	}
 
-			} else if u.Scheme == "" {
-				u.Scheme = "https"
-				fmt.Println("set https scheme ")
-			}
+	if u.Host == "" {
+		HostName := strings.Split(u.Path, ".")
+		if len(HostName) <= 1 {
+			http.Error(w, "please enter correct url", 400)
+			return
+
+		} else if u.Scheme == "" {
+			u.Scheme = "https"
+			fmt.Println("set https scheme ")
 		}
+	}
 
-		LongUrl := u.String()
+	LongUrl := u.String()
 
-		var ShortUrl string
+	var ShortUrl string
 
-		var short Short
+	var short Short
 
-		db := app.DB
-		defer app.Unlock()
+	db := app.DB
+	defer app.Unlock()
 
-		app.Lock()
-		if err := db.Where("url = ?", LongUrl).Find(&short).Error; err != nil {
-			UnquieUrl := false
+	app.Lock()
 
-			for UnquieUrl != true {
-				ShortUrl = GenerateShortUrl()
-				UnquieUrl = app.CheckIsUnqiue(ShortUrl)
+	if err := db.Where("url = ?", LongUrl).Find(&short).Error; err != nil {
+		UnquieUrl := false
 
-			}
-			short = Short{Url: LongUrl, ShortUrl: ShortUrl}
-			if err := db.Save(&short).Error; err != nil {
-				http.Error(w, "UNIQUE constraint failed", 400)
-			}
-		} else {
-			short = Short{Url: short.Url, ShortUrl: short.ShortUrl}
+		for UnquieUrl != true {
+			ShortUrl = GenerateShortUrl()
+			UnquieUrl = app.CheckIsUnqiue(ShortUrl)
+
 		}
-
-		var data = ShortOut{Url: short.Url, ShortUrl: short.ShortUrl}
-		if err := json.NewEncoder(w).Encode(data); err != nil {
-			panic(err)
+		short = Short{Url: LongUrl, ShortUrl: ShortUrl}
+		if err := db.Save(&short).Error; err != nil {
+			http.Error(w, "UNIQUE constraint failed", 400)
 		}
 	} else {
-		http.Error(w, "please enter correct url", 400)
+		short = Short{Url: short.Url, ShortUrl: short.ShortUrl}
+	}
+
+	var data = ShortOut{Url: short.Url, ShortUrl: short.ShortUrl}
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		panic(err)
 	}
 
 }
