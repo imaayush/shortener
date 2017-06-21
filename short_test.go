@@ -155,7 +155,7 @@ func TestCollisionPreveation(t *testing.T) {
 }
 
 func TestCollision(t *testing.T) {
-	//cleanTable()
+	cleanTable()
 	TestUrl := "https://goolge.com/home/param=11"
 	Input := ShortInput{TestUrl}
 	db := app.DB
@@ -164,10 +164,8 @@ func TestCollision(t *testing.T) {
 	resp := MakeRequest(t, Input, &data, "POST")
 	assert.Equal(t, resp.StatusCode, 200)
 	short = Short{Url: data.Url, ShortUrl: data.ShortUrl}
-	if err := db.Save(&short).Error; err != nil {
-
-		errStr := "pq: duplicate key value violates unique constraint \"shorts_short_url_key\""
-		assert.EqualError(t, err, errStr)
-	}
+	err := db.Save(&short).Error
+	errStr := "pq: duplicate key value violates unique constraint \"shorts_short_url_key\""
+	assert.EqualError(t, err, errStr)
 
 }
