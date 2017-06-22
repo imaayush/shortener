@@ -8,15 +8,15 @@ import (
 
 func main() {
 	app := App{}
-	app.Initialize("", "", DbName)
+	app.Initialize()
 
 	app.Run()
 
 }
 
-func (app *App) Initialize(user, password, DbName string) {
-
-	app.DB = Database(DbName)
+func (app *App) Initialize() {
+	app.SlagLength = SlagLength
+	app.DB = Database()
 
 	app.NewRouter()
 }

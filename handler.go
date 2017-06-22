@@ -2,75 +2,48 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"github.com/gorilla/mux"
-	"io/ioutil"
 	"net/http"
-	"net/url"
-	"strings"
 )
 
 func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	LongUrl, err := GetAndValidateInput(r.Body)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), 400)
 	}
-	ShortInput := ShortInput{}
-
-	if err := json.Unmarshal(body, &ShortInput); err != nil {
-		panic(err)
-	}
-
-	u, err := url.Parse(ShortInput.Url)
-	if err != nil {
-		http.Error(w, "please enter correct url", 400)
-		return
-	}
-
-	if u.Host == "" {
-		HostName := strings.Split(u.Path, ".")
-		if len(HostName) <= 1 {
-			http.Error(w, "please enter correct url", 400)
-			return
-
-		} else if u.Scheme == "" {
-			u.Scheme = "https"
-			fmt.Println("set https scheme ")
-		}
-	}
-
-	LongUrl := u.String()
-
-	var ShortUrl string
-
 	var short Short
-
 	db := app.DB
-	defer app.Unlock()
+	if err := db.Where("url = ?", LongUrl).Find(&short).Error; err == nil {
+		var data = Short{Url: short.Url, ShortUrl: short.ShortUrl}
+		if err := json.NewEncoder(w).Encode(data); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+	}
 
 	app.Lock()
+	defer app.Unlock()
+	var cnt int
 
-	if err := db.Where("url = ?", LongUrl).Find(&short).Error; err != nil {
-		UnquieUrl := false
+	var data Short
+	CollisionErr := errors.New("Start")
+	cnt = 0
+	for CollisionErr != nil && cnt < MaxUnqiueUrl {
+		db.Table("shorts").Count(&cnt)
+		data, CollisionErr = app.GenerateAndSave(LongUrl)
 
-		for UnquieUrl != true {
-			ShortUrl = GenerateShortUrl()
-			UnquieUrl = app.CheckIsUnqiue(ShortUrl)
-
-		}
-		short = Short{Url: LongUrl, ShortUrl: ShortUrl}
-		if err := db.Save(&short).Error; err != nil {
-			http.Error(w, "UNIQUE constraint failed", 400)
-		}
-	} else {
-		short = Short{Url: short.Url, ShortUrl: short.ShortUrl}
+	}
+	if CollisionErr != nil {
+		http.Error(w, CollisionErr.Error(), 500)
 	}
 
-	var data = ShortOut{Url: short.Url, ShortUrl: short.ShortUrl}
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		panic(err)
+		http.Error(w, err.Error(), 400)
+		return
 	}
-
+	return
 }
 
 func (app *App) ExpandUrl(w http.ResponseWriter, r *http.Request) {
