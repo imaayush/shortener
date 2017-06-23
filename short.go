@@ -15,7 +15,7 @@ func main() {
 }
 
 func (app *App) Initialize() {
-	app.SlagLength = SlagLength
+	app.SlugLength = SlugLength
 	app.DB = Database()
 
 	app.NewRouter()
