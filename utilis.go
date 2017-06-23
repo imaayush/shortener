@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -18,12 +18,12 @@ import (
 type App struct {
 	Router     *mux.Router
 	DB         *gorm.DB
-	SlagLength int
+	SlugLength int
 	sync.Mutex
 }
 
 func (app *App) GenerateShortUrl() string {
-	b := make([]rune, app.SlagLength)
+	b := make([]rune, app.SlugLength)
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
@@ -31,29 +31,29 @@ func (app *App) GenerateShortUrl() string {
 
 }
 
-func (app *App) CheckIsOnDb(url string) bool {
+func (app *App) CheckIsUniquie(url string) bool {
 	db := app.DB
 	var short Short
 	if err := db.Where("short_url = ?", string(url)).Find(&short).Error; err != nil {
-		return false
+		return true
 
 	} else {
-		return true
+		return false
 	}
 }
 func (app *App) GenerateAndSave(LongUrl string) (Short, error) {
 
 	ShortUrl := app.GenerateShortUrl()
-	data, err := app.SaveUrl(ShortUrl, LongUrl)
+	data, err := app.SaveUrlAndCheckUniquie(ShortUrl, LongUrl)
 	return data, err
 }
 
-func (app *App) SaveUrl(ShortUrl string, LongUrl string) (Short, error) {
+func (app *App) SaveUrlAndCheckUniquie(ShortUrl string, LongUrl string) (Short, error) {
 	db := app.DB
 	var short Short
-	IsOnDb := app.CheckIsOnDb(ShortUrl)
+	IsUniquie := app.CheckIsUniquie(ShortUrl)
 	err := errors.New("pq: duplicate key value violates unique constraint \"shorts_short_url_key\"")
-	if IsOnDb {
+	if !IsUniquie {
 		return Short{}, err
 	}
 	short = Short{Url: LongUrl, ShortUrl: ShortUrl}
@@ -88,8 +88,8 @@ func ValidateUrl(Url string) (string, error) {
 			return "", err
 
 		} else if u.Scheme == "" {
-			u.Scheme = "https"
-			fmt.Println("set https scheme ")
+			u.Scheme = "http"
+
 		}
 	}
 
