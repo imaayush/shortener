@@ -3,13 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"math/rand"
 	"testing"
 )
 
@@ -20,11 +19,11 @@ func TestMain(m *testing.M) {
 
 	app = App{}
 	app.Initialize()
-	app.SlagLength = 1
+
 	ts = httptest.NewServer(app.Router)
 
 	ret := m.Run()
-	SlagLength = 1
+
 	os.Exit(ret)
 
 }
@@ -57,48 +56,56 @@ func cleanTable() {
 	app.DB.Delete(&Short{})
 	app.DB.AutoMigrate(&Short{})
 }
-func TestShortUrlEndPointPassCase(t *testing.T) {
+func TestShortUrlEndPointVaildUrls(t *testing.T) {
 	cleanTable()
-	TestUrl := "https://goolge.com/home/param=12"
-	Input := ShortInput{TestUrl}
-	db := app.DB
-	var data ShortOut
-	var short Short
-	resp, _ := MakePostRequest(t, Input, &data)
-	assert.Equal(t, resp.StatusCode, 200)
-	assert.Equal(t, Input.Url, data.Url)
-	db.Where("short_url = ?", data.ShortUrl).Find(&short)
-	assert.Equal(t, short.ShortUrl, data.ShortUrl)
+	rndInt := rand.Int()
+	TestUrl := []string{"https://goolge.com/home/param=" +strconv.Itoa(rndInt), "127.0.0.1", "google.com"}
+	for i  :=  range TestUrl {
+		Input := ShortInput{TestUrl[i]}
+		db := app.DB
+		var data ShortOut
+		var short Short
+		resp, _ := MakePostRequest(t, Input, &data)
+		assert.Equal(t, resp.StatusCode, 200)
+		db.Where("short_url = ?", data.ShortUrl).Find(&short)
+		assert.Equal(t, short.ShortUrl, data.ShortUrl)
+	}
 
 }
 
-func TestExpandUrlEndPointPassCase(t *testing.T) {
+func TestExpandUrlEndPointVaildSlug(t *testing.T) {
 	cleanTable()
+	rndInt := rand.Int()
+	TestUrl := []string{"https://goolge.com/home/param="+strconv.Itoa(rndInt), "127.0.0.1", "google.com"}
+	for i  :=  range TestUrl {
 
-	TestUrl := "http://goolge.com/"
-	var data ShortOut
-	Input := ShortInput{TestUrl}
-	MakePostRequest(t, Input, &data)
-	assert.Equal(t, Input.Url, data.Url)
-	url := ts.URL + "/" + data.ShortUrl
-	Input = ShortInput{url}
-	resp := MakeGetRequest(t, Input)
-	assert.Equal(t, resp.StatusCode, 301)
+		var data ShortOut
+		Input := ShortInput{TestUrl[i]}
+		resp, _ :=MakePostRequest(t, Input, &data)
+		assert.Equal(t, resp.StatusCode, 200)
+		url := ts.URL + "/" + data.ShortUrl
+		Input = ShortInput{url}
+		resp = MakeGetRequest(t, Input)
+		assert.Equal(t, resp.StatusCode, 301)
+	}
 
 }
 
-func TestWrongInput(t *testing.T) {
-	TestCase := "google"
-
-	var data ShortOut
-	Input := ShortInput{TestCase}
-	resp, _ := MakePostRequest(t, Input, &data)
-	fmt.Println(resp)
-	assert.Equal(t, resp.StatusCode, 400)
+func TestShortUrlEndPointInvaildUrls(t *testing.T) {
+	TestUrl := []string{"google", "127.0.0.1:8000", ""}
+	for i  :=  range TestUrl {
+		var data ShortOut
+		Input := ShortInput{TestUrl[i]}
+		resp, _ := MakePostRequest(t, Input, &data)
+		assert.Equal(t, resp.StatusCode, 400)
+	}
 }
 
-func TestShortUrlNotFound(t *testing.T) {
-	url := ts.URL + "/" + "ASDFW"
+func TestSExpandUrlEndPointInvaildSlug(t *testing.T) {
+	app.SlugLength = 5
+	slug := app.GenerateShortUrl()
+	app.SlugLength = 4
+	url := ts.URL + "/" + slug
 	Input := ShortInput{url}
 	resp := MakeGetRequest(t, Input)
 	assert.Equal(t, resp.StatusCode, 404)
@@ -109,65 +116,22 @@ func TestResponseOnCollision(t *testing.T) {
 	TestUrl := "https://goolge.com/"
 
 	var data ShortOut
-	var respon *http.Response
-	for i := 0; i < 67; i++ {
+	app.SlugLength =1
+	for i := 0; i < 62; i++ {
 		url := TestUrl + strconv.Itoa(i)
 		Input := ShortInput{string(url)}
 		resp, _ := MakePostRequest(t, Input, &data)
 		json.NewDecoder(resp.Body).Decode(&data)
-		respon = resp
-		if resp.StatusCode == 500 {
-			respon = resp
+		assert.Equal(t, resp.StatusCode, 200)
 
-		}
 	}
 
-	assert.Equal(t, respon.StatusCode, 500)
-}
-
-func TestCheckShorUrlIsAddedToDB(t *testing.T) {
-	cleanTable()
-	TestUrl := "https://goolge.com/home/param=11"
-	Input := ShortInput{TestUrl}
-
-	var data ShortOut
-
+	url := TestUrl + strconv.Itoa(62)
+	Input := ShortInput{string(url)}
 	resp, _ := MakePostRequest(t, Input, &data)
-	assert.Equal(t, resp.StatusCode, 200)
+	json.NewDecoder(resp.Body).Decode(&data)
 
-	assert.Equal(t, app.CheckIsOnDb(data.ShortUrl), true)
+	assert.Equal(t, resp.StatusCode, 500)
+	app.SlugLength = 4
 }
 
-func TestSuccessfulSaveUnqiue(t *testing.T) {
-	cleanTable()
-	ShortUrl := app.GenerateShortUrl()
-	fmt.Println(ShortUrl)
-
-	assert.Equal(t, app.CheckIsOnDb(ShortUrl), false)
-
-	LongUrl := "https://google.com"
-	resp, err := app.SaveUrl(ShortUrl, LongUrl)
-
-	assert.Equal(t, resp.ShortUrl, ShortUrl)
-	assert.Equal(t, resp.Url, LongUrl)
-	assert.Equal(t, err, nil)
-}
-func TestFailTOSaveDuplicate(t *testing.T) {
-	cleanTable()
-	ShortUrl := app.GenerateShortUrl()
-
-	assert.Equal(t, app.CheckIsOnDb(ShortUrl), false)
-
-	LongUrl := "https://google.com"
-	resp, err := app.SaveUrl(ShortUrl, LongUrl)
-
-	assert.Equal(t, resp.ShortUrl, ShortUrl)
-	assert.Equal(t, resp.Url, LongUrl)
-	assert.Equal(t, err, nil)
-	//save dupliact
-	LongUrl = "https://facebook.com"
-	resp, err = app.SaveUrl(ShortUrl, LongUrl)
-	exceptedErr := errors.New("pq: duplicate key value violates unique constraint \"shorts_short_url_key\"")
-	assert.Equal(t, err, exceptedErr)
-
-}
