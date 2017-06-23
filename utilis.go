@@ -116,3 +116,7 @@ func GetAndValidateInput(r io.Reader) (string, error) {
 	}
 	return LongUrl, nil
 }
+
+func ConvetSlugTOUrl(slug string, host string)string{
+	return "http://" + host + "/" +  slug
+}

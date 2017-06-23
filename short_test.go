@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"math/rand"
 	"testing"
+	"net/url"
 )
 
 var ts *httptest.Server
@@ -67,8 +68,12 @@ func TestShortUrlEndPointVaildUrls(t *testing.T) {
 		var short Short
 		resp, _ := MakePostRequest(t, Input, &data)
 		assert.Equal(t, resp.StatusCode, 200)
-		db.Where("short_url = ?", data.ShortUrl).Find(&short)
-		assert.Equal(t, short.ShortUrl, data.ShortUrl)
+		u ,_ :=url.Parse(data.ShortUrl)
+
+
+		slug := u.Path[1:]
+		db.Where("short_url = ?", slug).Find(&short)
+		assert.Equal(t,short.ShortUrl, slug)
 	}
 
 }
@@ -76,15 +81,14 @@ func TestShortUrlEndPointVaildUrls(t *testing.T) {
 func TestExpandUrlEndPointVaildSlug(t *testing.T) {
 	cleanTable()
 	rndInt := rand.Int()
-	TestUrl := []string{"https://goolge.com/home/param="+strconv.Itoa(rndInt), "127.0.0.1", "google.com"}
+	TestUrl := []string{"https://goolge.com/home/param="+strconv.Itoa(rndInt), "127.0.0.1", "google.com", "newtime.com"}
 	for i  :=  range TestUrl {
 
 		var data ShortOut
 		Input := ShortInput{TestUrl[i]}
 		resp, _ :=MakePostRequest(t, Input, &data)
 		assert.Equal(t, resp.StatusCode, 200)
-		url := ts.URL + "/" + data.ShortUrl
-		Input = ShortInput{url}
+		Input = ShortInput{string(data.ShortUrl)}
 		resp = MakeGetRequest(t, Input)
 		assert.Equal(t, resp.StatusCode, 301)
 	}
@@ -97,7 +101,7 @@ func TestShortUrlEndPointInvaildUrls(t *testing.T) {
 		var data ShortOut
 		Input := ShortInput{TestUrl[i]}
 		resp, _ := MakePostRequest(t, Input, &data)
-		assert.Equal(t, resp.StatusCode, 400)
+		assert.Equal(t, resp.StatusCode, 412)
 	}
 }
 

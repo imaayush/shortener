@@ -10,7 +10,7 @@ import (
 func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 	LongUrl, err := GetAndValidateInput(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), 400)
+		http.Error(w, err.Error(), 412)
 	}
 	var short Short
 	db := app.DB
@@ -39,7 +39,7 @@ func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 	if CollisionErr != nil {
 		http.Error(w, CollisionErr.Error(), 500)
 	}
-
+	data.ShortUrl = ConvetSlugTOUrl(data.ShortUrl, r.Host)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
