@@ -30,6 +30,7 @@ func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 	var data Short
 	CollisionErr := errors.New("Start")
 	cnt = 0
+	MaxUnqiueUrl := len(letterRunes)^app.SlugLength -1
 	for CollisionErr != nil && cnt < MaxUnqiueUrl {
 		db.Table("shorts").Count(&cnt)
 		data, CollisionErr = app.GenerateAndSave(LongUrl)
@@ -49,7 +50,7 @@ func (app *App) ShortUrl(w http.ResponseWriter, r *http.Request) {
 func (app *App) ExpandUrl(w http.ResponseWriter, r *http.Request) {
 	var short Short
 	vars := mux.Vars(r)
-	ShortUrl := vars["uuid"]
+	ShortUrl := vars["slug"]
 	db := app.DB
 	if err := db.Where("short_url = ?", ShortUrl).First(&short).Error; err != nil {
 		http.Error(w, "Page not found", 404)
